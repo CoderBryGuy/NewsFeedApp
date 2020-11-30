@@ -1,6 +1,10 @@
 package com.example.newsfeedapp;
 
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.DatabaseUtils;
+import android.database.sqlite.SQLiteDatabase;
+import android.icu.text.Replaceable;
 import android.os.AsyncTask;
 import android.util.Log;
 import android.view.View;
@@ -47,10 +51,6 @@ public class MainActivity extends AppCompatActivity {
     private void setUpListView() {
 
         myListView = (ListView) findViewById(R.id.myListView);
-
-        //just to see something before getting APIs
-        newsItems.add("Example Article");
-
         arrayAdapter = new ArrayAdapter<String>(getApplicationContext(), android.R.layout.simple_list_item_1, newsItems);
         myListView.setAdapter(arrayAdapter);
 
@@ -72,6 +72,8 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected ArrayList<String> doInBackground(String... urls) {
 
+
+
             try {
 //                System.out.println("doInBackground()");
                 for (int i = 0; i < urls.length; i++) {
@@ -92,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
                         Log.i("RESULT STRING = ", resultString);
                         result.add(resultString);
                     }
+//                    System.out.println("==================IS THIS WORKING=================" + resultString);
 
                 }
 
@@ -109,19 +112,57 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(ArrayList<String> s) {
             super.onPostExecute(s);
+            SQLiteDatabase db = getApplicationContext().openOrCreateDatabase("JsonInfo", MODE_PRIVATE, null);
+            db.execSQL("CREATE TABLE IF NOT EXISTS articleList (id INTEGER PRIMARY KEY, article_id INT(8), title VARCHAR, articleURL NVARCHAR)");
+//            System.out.println("==================ONPOSTEXECUTE() WORKING=================" + s.toString());
+
+
+            for (String json: s) {
+
+            try {
+                JSONObject jsonObject = new JSONObject(json);
+                String url = jsonObject.getString("url");
+                int id = jsonObject.getInt("id");
+                String title = jsonObject.getString("title");
+                title = DatabaseUtils.sqlEscapeString(title);
+                title = title.replaceAll(":","");
+
+                Log.i("title123", title);
+                Log.i("url123", url);
+                Log.i("id123", String.valueOf(id));
+
+                //===NEED TO FIX THIS LINE====
+                db.execSQL("INSERT INTO articleList (article_id, title, articleURL) VALUES ("+id+", "+title+", "+url+" )");
+
+
+                newsItems.add(title);
+                arrayAdapter.notifyDataSetChanged();
+
+                Cursor c = db.rawQuery("SELECT * FROM articleList", null);
+                int idIndex = c.getColumnIndex("id");
+                int article_idIndex = c.getColumnIndex("article_id");
+                int titleIndex = c.getColumnIndex("title");
+                int articleURL = c.getColumnIndex("articleURL");
+
+                c.moveToFirst();
+                while(!c.isAfterLast()){
+                    Log.i("db123",
+                            " " + c.getInt(idIndex)
+                                    + ": " + c.getInt(article_idIndex)
+                                    + ": " + c.getString(titleIndex )
+                                    + ": " + c.getString(articleURL ) );
+
+                    c.moveToNext();
+                }
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            }
 
 //            System.out.println("==============API CODE============== " + s);
-//            try {
-//                JSONObject jsonObject = new JSONObject(s);
-//                String title = jsonObject.getString("title");
-//                String url = jsonObject.getString("url");
-//                Log.i("title123", title);
-//                Log.i("url123", url);
-//
-//
-//            } catch (JSONException e) {
-//                e.printStackTrace();
-//            }
+
         }
     }
 
@@ -171,12 +212,12 @@ public class MainActivity extends AppCompatActivity {
 //            Log.i("JSON", s);
             String[] arr = s.split(",");
             String code;
-            String[] articleURLs = new String[arr.length];
+            String[] articleURLs = new String[50];
 
-            for (int i = 0; i < arr.length; i++) {
+            for (int i = 0; i < 50; i++) {
                 code = arr[i].trim();
                 articleURLs[i] = "https://hacker-news.firebaseio.com/v0/item/"+ code +".json?print=pretty";
-//                Log.i("urlList", articleURLs[i]);
+                Log.i("urlList", articleURLs[i]);
             }
 
             myAPIGetter = new MyAPIGetter();
